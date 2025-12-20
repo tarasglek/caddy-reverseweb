@@ -24,7 +24,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/cgi"
-	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
@@ -34,7 +33,6 @@ import (
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/caddyserver/caddy/v2/modules/caddyhttp/reverseproxy"
 	"go.uber.org/zap"
 )
 
@@ -269,11 +267,7 @@ func (c *CGI) startProcess() error {
 	}
 	cmdEnv = append(cmdEnv, c.Envs...)
 
-	port := "0"
-	if c.Port != "" {
-		port = c.Port
-	}
-	cmdEnv = append(cmdEnv, "LISTEN_HOST=127.0.0.1:"+port)
+	cmdEnv = append(cmdEnv, "LISTEN_HOST=127.0.0.1:"+c.Port)
 	cmd.Env = cmdEnv
 
 	stdoutPipe, err := cmd.StdoutPipe()
@@ -295,50 +289,13 @@ func (c *CGI) startProcess() error {
 	}
 	c.process = cmd.Process
 
-	// Read address from stdout
-	reader := bufio.NewReader(stdoutPipe)
-	line, err := reader.ReadString('\n')
-	if err != nil {
-		c.process.Kill()
-		c.process = nil
-		return fmt.Errorf("failed to read address from stdout: %v", err)
-	}
-	c.proxyAddr = strings.TrimSpace(line)
-	c.logger.Info("discovered proxy address", zap.String("address", c.proxyAddr))
-
-	// Parse URL
-	if !strings.Contains(c.proxyAddr, "://") {
-		c.proxyAddr = "http://" + c.proxyAddr
-	}
-	target, err := url.Parse(c.proxyAddr)
-	if err != nil {
-		c.process.Kill()
-		c.process = nil
-		return fmt.Errorf("failed to parse proxy address '%s': %v", c.proxyAddr, err)
-	}
-
-	rp := &reverseproxy.Handler{
-		Upstreams: reverseproxy.UpstreamPool{
-			{Dial: target.Host},
-		},
-	}
-	if err := rp.Provision(c.ctx); err != nil {
-		c.process.Kill()
-		c.process = nil
-		return fmt.Errorf("failed to provision reverse proxy: %v", err)
-	}
-	c.reverseProxy = rp
-
 	// Handle stderr and process exit
 	go func() {
-		// Consume remaining stdout
+		// Consume stdout
 		go func() {
-			for {
-				line, err := reader.ReadString('\n')
-				if err != nil {
-					break
-				}
-				c.logger.Info("CGI process stdout", zap.String("msg", strings.TrimSpace(line)))
+			scanner := bufio.NewScanner(stdoutPipe)
+			for scanner.Scan() {
+				c.logger.Info("CGI process stdout", zap.String("msg", scanner.Text()))
 			}
 		}()
 
