@@ -87,6 +87,10 @@ func (c *CGI) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.H
 		cgiHandler.Args = append(cgiHandler.Args, repl.ReplaceAll(str, ""))
 	}
 
+	c.logger.Info("starting cgi subprocess",
+		zap.String("executable", cgiHandler.Path),
+		zap.Strings("args", cgiHandler.Args))
+
 	envAdd := func(key, val string) {
 		cgiHandler.Env = append(cgiHandler.Env, key+"="+val)
 	}
@@ -181,6 +185,10 @@ func (c *CGI) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.H
 			}
 		}
 		cgiHandler.ServeHTTP(cgiWriter, r)
+
+		c.logger.Info("cgi subprocess terminated",
+			zap.String("executable", cgiHandler.Path),
+			zap.Strings("args", cgiHandler.Args))
 	}
 
 	if c.logger != nil && errorBuffer.Len() > 0 {
