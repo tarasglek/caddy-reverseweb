@@ -224,6 +224,7 @@ func (c *CGI) serveProxy(w http.ResponseWriter, r *http.Request, next caddyhttp.
 	}
 
 	c.activeRequests++
+	c.logger.Debug("incremented active requests", zap.Int64("count", c.activeRequests))
 	c.mu.Unlock()
 
 	defer func() {
@@ -231,6 +232,7 @@ func (c *CGI) serveProxy(w http.ResponseWriter, r *http.Request, next caddyhttp.
 		defer c.mu.Unlock()
 
 		c.activeRequests--
+		c.logger.Debug("decremented active requests", zap.Int64("count", c.activeRequests))
 		if c.activeRequests == 0 {
 			c.idleTimer = time.AfterFunc(30*time.Second, func() {
 				c.mu.Lock()
@@ -303,6 +305,7 @@ func (c *CGI) startProcess() error {
 		return fmt.Errorf("failed to read address from stdout: %v", err)
 	}
 	c.proxyAddr = strings.TrimSpace(line)
+	c.logger.Info("discovered proxy address", zap.String("address", c.proxyAddr))
 
 	// Parse URL
 	if !strings.Contains(c.proxyAddr, "://") {
