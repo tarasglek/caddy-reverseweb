@@ -24,7 +24,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/cgi"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -35,6 +34,7 @@ import (
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp/reverseproxy"
 	"go.uber.org/zap"
 )
 
@@ -245,8 +245,7 @@ func (c *CGI) serveProxy(w http.ResponseWriter, r *http.Request, next caddyhttp.
 		}
 	}()
 
-	c.reverseProxy.ServeHTTP(w, r)
-	return nil
+	return c.reverseProxy.ServeHTTP(w, r, next)
 }
 
 func (c *CGI) startProcess() error {
@@ -318,7 +317,17 @@ func (c *CGI) startProcess() error {
 		return fmt.Errorf("failed to parse proxy address '%s': %v", c.proxyAddr, err)
 	}
 
-	c.reverseProxy = httputil.NewSingleHostReverseProxy(target)
+	rp := &reverseproxy.Handler{
+		Upstreams: reverseproxy.UpstreamPool{
+			{Dial: target.Host},
+		},
+	}
+	if err := rp.Provision(c.ctx); err != nil {
+		c.process.Kill()
+		c.process = nil
+		return fmt.Errorf("failed to provision reverse proxy: %v", err)
+	}
+	c.reverseProxy = rp
 
 	// Handle stderr and process exit
 	go func() {
