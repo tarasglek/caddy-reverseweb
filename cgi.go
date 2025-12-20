@@ -277,6 +277,10 @@ func (c *CGI) startProcess() error {
 		return err
 	}
 
+	c.logger.Info("starting proxy subprocess",
+		zap.String("executable", cmd.Path),
+		zap.Strings("args", cmd.Args))
+
 	if err := cmd.Start(); err != nil {
 		return err
 	}
@@ -324,7 +328,12 @@ func (c *CGI) startProcess() error {
 			c.logger.Info("CGI process stderr", zap.String("msg", scanner.Text()))
 		}
 
-		cmd.Wait()
+		err := cmd.Wait()
+		c.logger.Info("proxy subprocess terminated",
+			zap.String("executable", cmd.Path),
+			zap.Strings("args", cmd.Args),
+			zap.Error(err))
+
 		c.mu.Lock()
 		if c.process == cmd.Process {
 			c.process = nil
