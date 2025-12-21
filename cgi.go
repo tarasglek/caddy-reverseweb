@@ -307,21 +307,60 @@ func (c *CGI) startProcess() error {
 	}
 	c.process = cmd.Process
 
-	// Wait for readiness signal from stdout
-	reader := bufio.NewReader(stdoutPipe)
+	// Wait for readiness
 	expected := "127.0.0.1:" + c.Port
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			c.process.Kill()
+	reader := bufio.NewReader(stdoutPipe)
+
+	if c.ReadinessMethod != "" {
+		// HTTP Polling readiness check
+		checkURL := fmt.Sprintf("http://%s%s", expected, c.ReadinessPath)
+		client := &http.Client{Timeout: 80 * time.Millisecond}
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+
+		// Start a goroutine to drain stdout so the process doesn't block while we poll
+		readyChan := make(chan bool, 1)
+		go func() {
+			for {
+				req, _ := http.NewRequest(c.ReadinessMethod, checkURL, nil)
+				resp, err := client.Do(req)
+				if err == nil {
+					resp.Body.Close()
+					readyChan <- true
+					return
+				}
+				select {
+				case <-ticker.C:
+					continue
+				case <-c.ctx.Done():
+					return
+				}
+			}
+		}()
+
+		select {
+		case <-readyChan:
+			c.logger.Info("CGI process ready (http check)", zap.String("url", checkURL))
+		case <-time.After(10 * time.Second):
+			c.killProcessGroup()
 			c.process = nil
-			return fmt.Errorf("failed to read readiness signal from stdout: %v", err)
+			return fmt.Errorf("timeout waiting for CGI process readiness via HTTP")
 		}
-		if strings.Contains(line, expected) {
-			c.logger.Info("CGI process ready", zap.String("address", expected))
-			break
+	} else {
+		// Wait for readiness signal from stdout
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				c.killProcessGroup()
+				c.process = nil
+				return fmt.Errorf("failed to read readiness signal from stdout: %v", err)
+			}
+			if strings.Contains(line, expected) {
+				c.logger.Info("CGI process ready", zap.String("address", expected))
+				break
+			}
+			c.logger.Info("CGI process stdout (startup)", zap.String("msg", strings.TrimSpace(line)))
 		}
-		c.logger.Info("CGI process stdout (startup)", zap.String("msg", strings.TrimSpace(line)))
 	}
 
 	// Handle stderr and process exit
