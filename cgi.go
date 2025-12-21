@@ -26,9 +26,11 @@ import (
 	"net/http/cgi"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/caddyserver/caddy/v2"
@@ -196,6 +198,18 @@ func (c *CGI) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.H
 	return nil
 }
 
+func (c *CGI) killProcessGroup() {
+	if c.process == nil {
+		return
+	}
+	if runtime.GOOS != "windows" {
+		// Kill the process group
+		syscall.Kill(-c.process.Pid, syscall.SIGKILL)
+	} else {
+		c.process.Kill()
+	}
+}
+
 type instantWriter struct {
 	http.ResponseWriter
 }
@@ -237,7 +251,7 @@ func (c *CGI) serveProxy(w http.ResponseWriter, r *http.Request, next caddyhttp.
 				defer c.mu.Unlock()
 				if c.activeRequests == 0 && c.process != nil {
 					c.terminationMsg = "idle timeout"
-					c.process.Kill()
+					c.killProcessGroup()
 					c.process = nil
 				}
 			})
@@ -250,6 +264,9 @@ func (c *CGI) serveProxy(w http.ResponseWriter, r *http.Request, next caddyhttp.
 func (c *CGI) startProcess() error {
 	// Prepare command
 	cmd := exec.Command(c.Executable, c.Args...)
+	if runtime.GOOS != "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	}
 	cmd.Dir = c.WorkingDirectory
 	if cmd.Dir == "" {
 		cmd.Dir = "."
