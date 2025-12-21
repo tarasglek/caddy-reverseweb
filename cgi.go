@@ -319,14 +319,16 @@ func (c *CGI) startProcess() error {
 		defer ticker.Stop()
 
 		// Start a goroutine to drain stdout so the process doesn't block while we poll
-		readyChan := make(chan bool, 1)
+		readyChan := make(chan int, 1)
 		go func() {
+			checks := 0
 			for {
+				checks++
 				req, _ := http.NewRequest(c.ReadinessMethod, checkURL, nil)
 				resp, err := client.Do(req)
 				if err == nil {
 					resp.Body.Close()
-					readyChan <- true
+					readyChan <- checks
 					return
 				}
 				select {
@@ -339,8 +341,10 @@ func (c *CGI) startProcess() error {
 		}()
 
 		select {
-		case <-readyChan:
-			c.logger.Info("CGI process ready (http check)", zap.String("url", checkURL))
+		case checks := <-readyChan:
+			c.logger.Info("CGI process ready (http check)",
+				zap.String("url", checkURL),
+				zap.Int("checks", checks))
 		case <-time.After(10 * time.Second):
 			c.killProcessGroup()
 			c.process = nil
