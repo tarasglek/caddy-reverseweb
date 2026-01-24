@@ -1,5 +1,8 @@
 #!/bin/bash
 set -ex
 
+# Change to the directory of this script
+cd "$(dirname "$0")"
+
 # Call the central run script
-"$(dirname "$0")/../../cmd/caddy/run.sh" caddy.config
+../../cmd/caddy/run.sh caddy.config
