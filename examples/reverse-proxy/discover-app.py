@@ -22,6 +22,7 @@ def discover():
         "mode": "proxy",
         "workingDirectory": app_dir,
         "executable": "./main.py",
+        "args": ["--host", "127.0.0.1:8001"],
         "reverse_proxy_to": ":8001",
         "readiness_check": {
             "method": "HEAD",
