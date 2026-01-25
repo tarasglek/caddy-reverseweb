@@ -335,6 +335,10 @@ func (c *CGI) startProcess() error {
 
 		// Start a goroutine to drain stdout so the process doesn't block while we poll
 		readyChan := make(chan int, 1)
+		exitChan := make(chan error, 1)
+		go func() {
+			exitChan <- cmd.Wait()
+		}()
 		go func() {
 			checks := 0
 			for {
@@ -364,6 +368,9 @@ func (c *CGI) startProcess() error {
 			c.logger.Info("CGI process ready (http check)",
 				zap.String("url", checkURL),
 				zap.Int("checks", checks))
+		case err := <-exitChan:
+			c.process = nil
+			return fmt.Errorf("CGI process terminated unexpectedly during readiness check: %v", err)
 		case <-time.After(30 * time.Second):
 			c.killProcessGroup()
 			c.process = nil
@@ -407,7 +414,14 @@ func (c *CGI) startProcess() error {
 			c.logger.Info("CGI process stderr", zap.String("msg", scanner.Text()))
 		}
 
-		err := cmd.Wait()
+		var err error
+		if c.ReadinessMethod != "" {
+			// In HTTP mode, Wait() was already called by the exitChan goroutine
+			err = <-exitChan
+		} else {
+			err = cmd.Wait()
+		}
+
 		c.mu.Lock()
 		reason := c.terminationMsg
 		if reason == "" {
