@@ -43,6 +43,8 @@ class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
             return
 
         # Update Caddy API to include subdomain path
+        # instead of literal subdomain parse host from X-Forwarded-Host: python3-echo.localhost:9080 header as url then split .[0] AI!
+        
         app_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "subdomain"))
         subdomain_config = {
             "match": [{"host": [self.headers.get('Host')]}],
