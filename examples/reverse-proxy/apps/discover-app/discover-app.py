@@ -91,7 +91,10 @@ class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
                 "PUT",
                 "/config/apps/http/servers/srv0/routes/0",
                 body=json.dumps(subdomain_config).encode(),
-                headers={'Content-Type': 'application/json'}
+                headers={
+                    'Content-Type': 'application/json',
+                    'Origin': 'http://localhost'
+                }
             )
             resp = conn.getresponse()
             if resp.status >= 300:
