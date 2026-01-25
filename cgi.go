@@ -266,7 +266,6 @@ func (c *CGI) serveProxy(w http.ResponseWriter, r *http.Request, next caddyhttp.
 }
 
 func (c *CGI) startProcess() error {
-	// Prepare command
 	cmd := exec.Command(c.Executable, c.Args...)
 	if runtime.GOOS != "windows" {
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -276,7 +275,6 @@ func (c *CGI) startProcess() error {
 		cmd.Dir = "."
 	}
 
-	// Environment
 	var cmdEnv []string
 	if c.PassAll {
 		cmdEnv = os.Environ()
@@ -294,7 +292,6 @@ func (c *CGI) startProcess() error {
 	if err != nil {
 		return err
 	}
-
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
 		return err
@@ -307,130 +304,28 @@ func (c *CGI) startProcess() error {
 	if err := cmd.Start(); err != nil {
 		c.logger.Error("failed to start proxy subprocess",
 			zap.String("executable", cmd.Path),
-			zap.Strings("args", cmd.Args),
 			zap.Error(err))
 		return err
 	}
 	c.process = cmd.Process
 
-	// Wait for readiness
-	expected := c.ReverseProxyTo
-	if strings.HasPrefix(expected, ":") {
-		expected = "127.0.0.1" + expected
-	}
-	expected = strings.TrimPrefix(expected, "http://")
-	expected = strings.TrimPrefix(expected, "https://")
-
-	reader := bufio.NewReader(stdoutPipe)
-
-	if c.ReadinessMethod != "" {
-		// HTTP Polling readiness check
-		scheme := "http"
-		if strings.HasPrefix(c.ReverseProxyTo, "https://") {
-			scheme = "https"
-		}
-		checkURL := fmt.Sprintf("%s://%s%s", scheme, expected, c.ReadinessPath)
-		c.logger.Info("waiting for CGI process readiness via HTTP polling",
-			zap.String("method", c.ReadinessMethod),
-			zap.String("url", checkURL))
-		client := &http.Client{Timeout: 500 * time.Millisecond}
-		ticker := time.NewTicker(200 * time.Millisecond)
-		defer ticker.Stop()
-
-		// Start a goroutine to drain stdout so the process doesn't block while we poll
-		readyChan := make(chan int, 1)
-		exitChan := make(chan error, 1)
-		go func() {
-			err := cmd.Wait()
-			if err != nil {
-				c.logger.Debug("proxy process exited", zap.Error(err))
-			}
-			exitChan <- err
-		}()
-		go func() {
-			checks := 0
-			for {
-				checks++
-				req, _ := http.NewRequest(c.ReadinessMethod, checkURL, nil)
-				resp, err := client.Do(req)
-				if err == nil {
-					resp.Body.Close()
-					readyChan <- checks
-					return
-				}
-				c.logger.Info("readiness check failed",
-					zap.String("url", checkURL),
-					zap.Int("attempt", checks),
-					zap.Error(err))
-				select {
-				case <-ticker.C:
-					continue
-				case <-c.ctx.Done():
-					return
-				}
-			}
-		}()
-
-		select {
-		case checks := <-readyChan:
-			c.logger.Info("CGI process ready (http check)",
-				zap.String("url", checkURL),
-				zap.Int("checks", checks))
-		case err := <-exitChan:
-			c.process = nil
-			c.logger.Error("CGI process terminated unexpectedly during readiness check",
-				zap.Error(err))
-			return fmt.Errorf("CGI process terminated unexpectedly during readiness check: %v", err)
-		case <-time.After(10 * time.Second):
-			c.killProcessGroup()
-			c.process = nil
-			return fmt.Errorf("timeout waiting for CGI process readiness via HTTP at %s", checkURL)
-		}
-	} else {
-		// Wait for readiness signal from stdout
-		c.logger.Info("waiting for CGI process readiness via stdout",
-			zap.String("expected_substring", expected))
-		for {
-			line, err := reader.ReadString('\n')
-			if err != nil {
-				c.killProcessGroup()
-				c.process = nil
-				return fmt.Errorf("failed to read readiness signal from stdout: %v", err)
-			}
-			if strings.Contains(line, expected) {
-				c.logger.Info("CGI process ready", zap.String("address", expected))
-				break
-			}
-			c.logger.Info("CGI process stdout (startup)", zap.String("msg", strings.TrimSpace(line)))
-		}
-	}
-
-	// Handle stderr and process exit
+	exitChan := make(chan error, 1)
 	go func() {
-		// Consume remaining stdout
+		// Drain stdout/stderr in background
 		go func() {
-			for {
-				line, err := reader.ReadString('\n')
-				if err != nil {
-					break
-				}
-				c.logger.Info("CGI process stdout", zap.String("msg", strings.TrimSpace(line)))
+			scanner := bufio.NewScanner(stdoutPipe)
+			for scanner.Scan() {
+				c.logger.Info("CGI process stdout", zap.String("msg", scanner.Text()))
+			}
+		}()
+		go func() {
+			scanner := bufio.NewScanner(stderrPipe)
+			for scanner.Scan() {
+				c.logger.Info("CGI process stderr", zap.String("msg", scanner.Text()))
 			}
 		}()
 
-		// Consume stderr
-		scanner := bufio.NewScanner(stderrPipe)
-		for scanner.Scan() {
-			c.logger.Info("CGI process stderr", zap.String("msg", scanner.Text()))
-		}
-
-		var err error
-		if c.ReadinessMethod != "" {
-			// In HTTP mode, Wait() was already called by the exitChan goroutine
-			err = <-exitChan
-		} else {
-			err = cmd.Wait()
-		}
+		err := cmd.Wait()
 
 		c.mu.Lock()
 		reason := c.terminationMsg
@@ -445,10 +340,65 @@ func (c *CGI) startProcess() error {
 
 		c.logger.Info("proxy subprocess terminated",
 			zap.String("executable", cmd.Path),
-			zap.Strings("args", cmd.Args),
 			zap.String("reason", reason),
 			zap.Error(err))
+		exitChan <- err
 	}()
 
-	return nil
+	// Readiness check
+	expected := c.ReverseProxyTo
+	if strings.HasPrefix(expected, ":") {
+		expected = "127.0.0.1" + expected
+	}
+	expected = strings.TrimPrefix(expected, "http://")
+	expected = strings.TrimPrefix(expected, "https://")
+
+	readyChan := make(chan bool, 1)
+	if c.ReadinessMethod != "" {
+		scheme := "http"
+		if strings.HasPrefix(c.ReverseProxyTo, "https://") {
+			scheme = "https"
+		}
+		checkURL := fmt.Sprintf("%s://%s%s", scheme, expected, c.ReadinessPath)
+		c.logger.Info("waiting for CGI process readiness via HTTP polling",
+			zap.String("method", c.ReadinessMethod),
+			zap.String("url", checkURL))
+
+		go func() {
+			client := &http.Client{Timeout: 500 * time.Millisecond}
+			ticker := time.NewTicker(200 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					req, _ := http.NewRequest(c.ReadinessMethod, checkURL, nil)
+					resp, err := client.Do(req)
+					if err == nil {
+						resp.Body.Close()
+						if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+							readyChan <- true
+							return
+						}
+					}
+				case <-c.ctx.Done():
+					return
+				}
+			}
+		}()
+	} else {
+		// If no HTTP check, we assume it's ready immediately as we are draining stdout
+		// (The previous stdout-substring logic was fragile and blocked the drainer)
+		readyChan <- true
+	}
+
+	select {
+	case <-readyChan:
+		c.logger.Info("CGI process ready", zap.String("address", expected))
+		return nil
+	case err := <-exitChan:
+		return fmt.Errorf("CGI process exited during readiness check: %v", err)
+	case <-time.After(10 * time.Second):
+		c.killProcessGroup()
+		return fmt.Errorf("timeout waiting for CGI process readiness")
+	}
 }
