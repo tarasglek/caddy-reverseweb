@@ -6,8 +6,12 @@ import json
 import os
 import socket
 import random
-# allow HEAD / with 200 AI!
+
 class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
+
     def do_GET(self):
         print(f"Request: {self.command} {self.path}")
         
