@@ -65,12 +65,17 @@ class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
         subdomain_config = {
             "match": [{"host": [host_only]}],
             "handle": [{
-                "handler": "reverse-bin",
-                "mode": "proxy",
-                "workingDirectory": app_root,
-                "executable": "./main.py",
-                "args": [f"{port}"],
-                "reverse_proxy_to": f":{port}"
+                "handler": "subroute",
+                "routes": [{
+                    "handle": [{
+                        "handler": "reverse-bin",
+                        "mode": "proxy",
+                        "workingDirectory": app_root,
+                        "executable": "./main.py",
+                        "args": [f"{port}"],
+                        "reverse_proxy_to": f":{port}"
+                    }]
+                }]
             }],
             "terminal": True
         }
