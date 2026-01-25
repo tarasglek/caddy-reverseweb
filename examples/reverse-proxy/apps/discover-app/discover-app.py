@@ -13,7 +13,7 @@ class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        print(f"Request: {self.command} {self.path}")
+        print(f"Request: {self.command} {self.path}") #also include headers AI!
         
         # Find an available port
         port = None
