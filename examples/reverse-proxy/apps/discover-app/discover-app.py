@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 import sys
 import http.server
-import urllib.request
+import http.client
 import json
 import os
 import socket
 import random
+
+class UnixHTTPConnection(http.client.HTTPConnection):
+    def connect(self):
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.connect("/tmp/caddy.sock")
 
 class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
     def do_HEAD(self):
@@ -81,14 +86,17 @@ class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
         }
         
         try:
-            req = urllib.request.Request(
-                "http://localhost:2019/config/apps/http/servers/srv0/routes/0",
-                data=json.dumps(subdomain_config).encode(),
-                method='PUT',
+            conn = UnixHTTPConnection('localhost')
+            conn.request(
+                "PUT",
+                "/config/apps/http/servers/srv0/routes/0",
+                body=json.dumps(subdomain_config).encode(),
                 headers={'Content-Type': 'application/json'}
             )
-            with urllib.request.urlopen(req) as f:
-                pass
+            resp = conn.getresponse()
+            if resp.status >= 300:
+                raise Exception(f"Caddy returned {resp.status} {resp.reason}")
+            conn.close()
             
             # Issue redirect after successful update
             self.send_response(302)
