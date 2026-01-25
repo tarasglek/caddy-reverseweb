@@ -44,12 +44,16 @@ class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
         # Update Caddy API to include subdomain path
         app_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "subdomain"))
         subdomain_config = {
-            "handler": "reverse-bin",
-            "mode": "proxy",
-            "workingDirectory": app_root,
-            "executable": "./main.py",
-            "args": ["--port", str(port)],
-            "reverse_proxy_to": f":{port}"
+            "match": [{"host": [self.headers.get('Host')]}],
+            "handle": [{
+                "handler": "reverse-bin",
+                "mode": "proxy",
+                "workingDirectory": app_root,
+                "executable": "./main.py",
+                "args": ["--port", str(port)],
+                "reverse_proxy_to": f":{port}"
+            }],
+            "terminal": True
         }
         
         try:
