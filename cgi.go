@@ -284,8 +284,6 @@ func (c *CGI) startProcess() error {
 		}
 	}
 	cmdEnv = append(cmdEnv, c.Envs...)
-
-	cmdEnv = append(cmdEnv, "LISTEN_HOST=127.0.0.1:"+c.Port)
 	cmd.Env = cmdEnv
 
 	stdoutPipe, err := cmd.StdoutPipe()
