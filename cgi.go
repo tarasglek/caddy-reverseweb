@@ -322,8 +322,8 @@ func (c *CGI) startProcess() error {
 			scheme = "https"
 		}
 		checkURL := fmt.Sprintf("%s://%s%s", scheme, expected, c.ReadinessPath)
-		client := &http.Client{Timeout: 80 * time.Millisecond}
-		ticker := time.NewTicker(100 * time.Millisecond)
+		client := &http.Client{Timeout: 500 * time.Millisecond}
+		ticker := time.NewTicker(200 * time.Millisecond)
 		defer ticker.Stop()
 
 		// Start a goroutine to drain stdout so the process doesn't block while we poll
@@ -339,6 +339,10 @@ func (c *CGI) startProcess() error {
 					readyChan <- checks
 					return
 				}
+				c.logger.Debug("readiness check failed",
+					zap.String("url", checkURL),
+					zap.Int("attempt", checks),
+					zap.Error(err))
 				select {
 				case <-ticker.C:
 					continue
@@ -353,10 +357,10 @@ func (c *CGI) startProcess() error {
 			c.logger.Info("CGI process ready (http check)",
 				zap.String("url", checkURL),
 				zap.Int("checks", checks))
-		case <-time.After(10 * time.Second):
+		case <-time.After(30 * time.Second):
 			c.killProcessGroup()
 			c.process = nil
-			return fmt.Errorf("timeout waiting for CGI process readiness via HTTP")
+			return fmt.Errorf("timeout waiting for CGI process readiness via HTTP at %s", checkURL)
 		}
 	} else {
 		// Wait for readiness signal from stdout
