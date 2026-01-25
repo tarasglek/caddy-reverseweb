@@ -20,7 +20,8 @@ def discover():
     config = {
         "handler": "reverse-bin",
         "mode": "proxy",
-        "executable": main_py,
+        "workingDirectory": app_dir,
+        "executable": "./main.py",
         "reverse_proxy_to": ":8001",
         "readiness_check": {
             "method": "HEAD",
