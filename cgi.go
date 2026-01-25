@@ -373,7 +373,7 @@ func (c *CGI) startProcess() error {
 			c.logger.Error("CGI process terminated unexpectedly during readiness check",
 				zap.Error(err))
 			return fmt.Errorf("CGI process terminated unexpectedly during readiness check: %v", err)
-		case <-time.After(30 * time.Second):
+		case <-time.After(10 * time.Second):
 			c.killProcessGroup()
 			c.process = nil
 			return fmt.Errorf("timeout waiting for CGI process readiness via HTTP at %s", checkURL)
