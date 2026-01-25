@@ -1,44 +1,49 @@
 #!/usr/bin/env python3
-# change this file to be invoked with :port on cmdline and start an http server..then have a generic http request log request type,pathm and update caddy api to include subdomain path ../../aoos/subdomain/main.py AI!
-import os
 import sys
+import http.server
+import urllib.request
 import json
 
-def discover():
-    if len(sys.argv) < 2:
-        print("Usage: discover-app.py <app_dir>")
-        sys.exit(1)
+class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        print(f"Request: {self.command} {self.path}")
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Discovery active")
 
-    app_dir = sys.argv[1]
-    main_py = os.path.join(app_dir, "main.py")
-
-    if not os.path.isfile(main_py):
-        print(f"Error: {main_py} not found")
-        sys.exit(1)
-
-    # Configuration for the reverse-bin module
-    # We assume the app will listen on a port provided by the module or a default
-    config = {
-        "handler": "reverse-bin",
-        "mode": "proxy",
-        "workingDirectory": app_dir,
-        "executable": "./main.py",
-        "args": ["--host", "127.0.0.1:8001"],
-        "reverse_proxy_to": ":8001",
-        "readiness_check": {
-            "method": "HEAD",
-            "path": "/"
+        # Update Caddy API to include subdomain path
+        subdomain_config = {
+            "handler": "reverse-bin",
+            "mode": "proxy",
+            "executable": "../../apps/subdomain/main.py",
+            "args": ["--port", "8002"],
+            "reverse_proxy_to": ":8002"
         }
-    }
+        
+        try:
+            req = urllib.request.Request(
+                "http://localhost:2019/config/apps/http/servers/srv0/routes",
+                data=json.dumps(subdomain_config).encode(),
+                method='POST',
+                headers={'Content-Type': 'application/json'}
+            )
+            with urllib.request.urlopen(req) as f:
+                print(f"Caddy API response: {f.status}")
+        except Exception as e:
+            print(f"Failed to update Caddy: {e}")
 
-    output_file = os.path.join(app_dir, "reverse-bin-caddy.json")
-    try:
-        with open(output_file, "w") as f:
-            json.dump(config, f, indent=4)
-        print(f"Generated {output_file}")
-    except Exception as e:
-        print(f"Error writing config: {e}")
+def run():
+    if len(sys.argv) < 2:
+        print("Usage: discover-app.py :<port>")
         sys.exit(1)
+    
+    port_str = sys.argv[1].replace(':', '')
+    port = int(port_str)
+    
+    server_address = ('', port)
+    httpd = http.server.HTTPServer(server_address, DiscoveryHandler)
+    print(f"Starting discovery server on port {port}...")
+    httpd.serve_forever()
 
 if __name__ == "__main__":
-    discover()
+    run()
