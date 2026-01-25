@@ -4,11 +4,18 @@ import http.server
 import urllib.request
 import json
 import os
+import socket
 
 class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         print(f"Request: {self.command} {self.path}")
         
+        # Find an available port
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(('', 0))
+        port = s.getsockname()[1]
+        s.close()
+
         # Update Caddy API to include subdomain path
         app_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "subdomain"))
         subdomain_config = {
@@ -16,8 +23,8 @@ class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
             "mode": "proxy",
             "workingDirectory": app_root,
             "executable": "./main.py",
-            "args": ["--port", "8002"],
-            "reverse_proxy_to": ":8002"
+            "args": ["--port", str(port)],
+            "reverse_proxy_to": f":{port}"
         }
         
         try:
