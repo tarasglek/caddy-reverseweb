@@ -59,7 +59,12 @@ class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
 
 
         app_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", subdomain))
-        # check if app root exits AI!
+        if not os.path.isdir(app_root):
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write(f"Application directory not found: {subdomain}".encode())
+            return
+
         subdomain_config = {
             "match": [{"host": [forwarded_host]}],
             "handle": [{
