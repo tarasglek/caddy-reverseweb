@@ -306,12 +306,22 @@ func (c *CGI) startProcess() error {
 	c.process = cmd.Process
 
 	// Wait for readiness
-	expected := "127.0.0.1:" + c.Port
+	expected := c.ReverseProxyTo
+	if strings.HasPrefix(expected, ":") {
+		expected = "127.0.0.1" + expected
+	}
+	expected = strings.TrimPrefix(expected, "http://")
+	expected = strings.TrimPrefix(expected, "https://")
+
 	reader := bufio.NewReader(stdoutPipe)
 
 	if c.ReadinessMethod != "" {
 		// HTTP Polling readiness check
-		checkURL := fmt.Sprintf("http://%s%s", expected, c.ReadinessPath)
+		scheme := "http"
+		if strings.HasPrefix(c.ReverseProxyTo, "https://") {
+			scheme = "https"
+		}
+		checkURL := fmt.Sprintf("%s://%s%s", scheme, expected, c.ReadinessPath)
 		client := &http.Client{Timeout: 80 * time.Millisecond}
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
