@@ -7,10 +7,7 @@ import json
 class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         print(f"Request: {self.command} {self.path}")
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Discovery active")
-
+        
         # Update Caddy API to include subdomain path
         subdomain_config = {
             "handler": "reverse-bin",
@@ -29,8 +26,17 @@ class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
             )
             with urllib.request.urlopen(req) as f:
                 print(f"Caddy API response: {f.status}")
+            
+            # Issue redirect after successful update
+            self.send_response(302)
+            self.send_header('Location', self.path)
+            self.end_headers()
+            return
         except Exception as e:
             print(f"Failed to update Caddy: {e}")
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(f"Failed to update Caddy: {e}".encode())
 
 def run():
     if len(sys.argv) < 2:
