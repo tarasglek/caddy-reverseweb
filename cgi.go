@@ -315,13 +315,13 @@ func (c *CGI) startProcess() error {
 		go func() {
 			scanner := bufio.NewScanner(stdoutPipe)
 			for scanner.Scan() {
-				c.logger.Info("CGI process stdout", zap.String("msg", scanner.Text()))
+				c.logger.Info("reverse proxy process stdout", zap.String("msg", scanner.Text()))
 			}
 		}()
 		go func() {
 			scanner := bufio.NewScanner(stderrPipe)
 			for scanner.Scan() {
-				c.logger.Info("CGI process stderr", zap.String("msg", scanner.Text()))
+				c.logger.Info("reverse proxy process stderr", zap.String("msg", scanner.Text()))
 			}
 		}()
 
@@ -360,7 +360,7 @@ func (c *CGI) startProcess() error {
 			scheme = "https"
 		}
 		checkURL := fmt.Sprintf("%s://%s%s", scheme, expected, c.ReadinessPath)
-		c.logger.Info("waiting for CGI process readiness via HTTP polling",
+		c.logger.Info("waiting for reverse proxy process readiness via HTTP polling",
 			zap.String("method", c.ReadinessMethod),
 			zap.String("url", checkURL))
 
@@ -393,12 +393,12 @@ func (c *CGI) startProcess() error {
 
 	select {
 	case <-readyChan:
-		c.logger.Info("CGI process ready", zap.String("address", expected))
+		c.logger.Info("reverse proxy process ready", zap.String("address", expected))
 		return nil
 	case err := <-exitChan:
-		return fmt.Errorf("CGI process exited during readiness check: %v", err)
+		return fmt.Errorf("reverse proxy process exited during readiness check: %v", err)
 	case <-time.After(10 * time.Second):
 		c.killProcessGroup()
-		return fmt.Errorf("timeout waiting for CGI process readiness")
+		return fmt.Errorf("timeout waiting for reverse proxy process readiness")
 	}
 }
