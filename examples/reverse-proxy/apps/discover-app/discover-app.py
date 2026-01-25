@@ -57,7 +57,9 @@ class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(b"Could not determine subdomain from host")
             return
 
-        app_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "subdomain"))
+
+        app_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", subdomain))
+        # check if app root exits AI!
         subdomain_config = {
             "match": [{"host": [forwarded_host]}],
             "handle": [{
