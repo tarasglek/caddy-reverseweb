@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import sys
+import socket
 from pathlib import Path
 from typing import Any
 
@@ -31,16 +32,35 @@ def wrap_landrun(
 
     return wrapper + cmd
 
-def detect_dir(dir) #write a func that detects main.py and returns uv run to run it..and main.ts and uses deno serve..also write a function to find free port bind to AI! 
+def find_free_port() -> int:
+    """Finds a free TCP port by binding to port 0."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("", 0))
+        return s.getsockname()[1]
+
+def detect_dir(working_dir: Path, port: int) -> list[str] | None:
+    """Detects the application type and returns the command to run it."""
+    if (working_dir / "main.py").exists():
+        return ["uv", "run", "main.py", "--port", str(port)]
+    if (working_dir / "main.ts").exists():
+        return ["deno", "serve", "--port", str(port), "main.ts"]
+    return None
+
 def main() -> None:
     working_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
     if not working_dir.is_dir():
         print(f"Error: directory {working_dir} does not exist", file=sys.stderr)
         sys.exit(1)
 
+    port = find_free_port()
+    executable = detect_dir(working_dir, port)
+
+    if not executable:
+        executable = ["python3", "-m", "http.server", str(port)]
+
     result: dict[str, Any] = {
-        "executable": ["python3", "-m", "http.server", "23232"],
-        "reverse_proxy_to": ":23232",
+        "executable": executable,
+        "reverse_proxy_to": f":{port}",
         "working_directory": str(working_dir.resolve()),
     }
 
