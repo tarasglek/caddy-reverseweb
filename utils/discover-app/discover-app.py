@@ -96,7 +96,7 @@ def main() -> None:
     # Wrap the executable with landrun for sandboxing
     executable = wrap_landrun(
         executable,
-        rwx=[str(working_dir.resolve())],
+        rox=[str(working_dir.resolve())],
         bind_tcp=[port],
         envs=[f"PORT={port}"],
         include_std=True
