@@ -17,13 +17,8 @@ class EchoHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
 if __name__ == "__main__":
-    # Default to port 8001 if not specified
-    port = 8001
-    if len(sys.argv) > 1:
-        try:
-            port = int(sys.argv[1])
-        except ValueError:
-            pass
+    # Use PORT environment variable, default to 8001
+    port = int(os.environ.get("PORT", 8001))
 
     server_address = ('127.0.0.1', port)
     httpd = http.server.HTTPServer(server_address, EchoHandler)
