@@ -5,6 +5,21 @@ import socket
 from pathlib import Path
 from typing import Any
 
+"""
+- `--ro <path>`: Allow read-only access to specified path (can be specified multiple times or as comma-separated values)
+- `--rox <path>`: Allow read-only access with execution to specified path (can be specified multiple times or as comma-separated values)
+- `--rw <path>`: Allow read-write access to specified path (can be specified multiple times or as comma-separated values)
+- `--rwx <path>`: Allow read-write access with execution to specified path (can be specified multiple times or as comma-separated values)
+- `--bind-tcp <port>`: Allow binding to specified TCP port (can be specified multiple times or as comma-separated values)
+- `--connect-tcp <port>`: Allow connecting to specified TCP port (can be specified multiple times or as comma-separated values)
+- `--env <var>`: Environment variable to pass to the sandboxed command (format: KEY=VALUE or just KEY to pass current value)
+- `--best-effort`: Use best effort mode, falling back to less restrictive sandbox if necessary [default: disabled]
+- `--log-level <level>`: Set logging level (error, info, debug) [default: "error"]
+- `--unrestricted-network`: Allows unrestricted network access (disables all network restrictions)
+- `--unrestricted-filesystem`: Allows unrestricted filesystem access (disables all filesystem restrictions)
+- `--add-exec`: Automatically adds the executing binary to --rox
+- `--ldd`: Automatically adds required libraries to --rox
+"""
 def wrap_landrun(
     cmd: list[str],
     rwx: list[str] | None = None,
