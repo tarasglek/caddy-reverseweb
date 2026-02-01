@@ -58,6 +58,13 @@ def main() -> None:
     if not executable:
         executable = ["python3", "-m", "http.server", str(port)]
 
+    # Wrap the executable with landrun for sandboxing
+    executable = wrap_landrun(
+        executable,
+        rwx=[str(working_dir.resolve())],
+        bind_tcp=[port]
+    )
+
     result: dict[str, Any] = {
         "executable": executable,
         "reverse_proxy_to": f":{port}",
