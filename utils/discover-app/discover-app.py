@@ -95,7 +95,7 @@ def main() -> None:
 
     # Wrap the executable with landrun for sandboxing
     data_dir = working_dir / "data"
-    rw_paths = [str(data_dir.resolve())]
+    rw_paths = [str(data_dir.resolve())] #ok filter this for dirs that exist AI!
 
     executable = wrap_landrun(
         executable,
