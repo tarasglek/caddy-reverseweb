@@ -32,9 +32,12 @@ def wrap_landrun(
     unrestricted_network: bool = False,
     envs: list[str] | None = None,
     include_std: bool = False,
+    include_path: bool = False,
 ) -> list[str]:
     """Wraps a command with landrun for sandboxing."""
     wrapper = ["landrun"]
+    rox = rox or []
+    envs = envs or []
 
     if include_std:
         # Standard system paths required for most binaries and scripts to run.
@@ -43,6 +46,13 @@ def wrap_landrun(
         wrapper.extend(["--rox", "/bin,/usr,/lib,/lib64"])
         wrapper.extend(["--ro", "/etc"])
         wrapper.extend(["--rw", "/dev"])
+
+    if include_path and "PATH" in os.environ:
+        path_val = os.environ["PATH"]
+        envs.append(f"PATH={path_val}")
+        for p in path_val.split(os.pathsep):
+            if p:
+                rox.append(p)
 
     if envs:
         for env in envs:
@@ -97,9 +107,6 @@ def main() -> None:
     data_dir = working_dir / "data"
     rw_paths = [str(data_dir.resolve()) for p in [data_dir] if p.is_dir()]
 
-    if "PATH" in os.environ:
-        envs.append(f"PATH={os.environ['PATH']}")
-
     executable = wrap_landrun(
         executable,
         rox=[str(working_dir.resolve())],
@@ -107,8 +114,8 @@ def main() -> None:
         bind_tcp=[port],
         unrestricted_network=True,
         envs=envs,
-        include_std=True
-        # add include_PATH which would add env and also split it and do allow-rox for every component AI!..dopit inside of wrap landrun AI!
+        include_std=True,
+        include_path=True
     )
 
     result: dict[str, Any] = {
