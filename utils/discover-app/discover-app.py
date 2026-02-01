@@ -32,7 +32,7 @@ def wrap_landrun(
     unrestricted_network: bool = False,
     envs: list[str] | None = None,
     include_std: bool = False,
-    include_path: bool = False,
+    include_PATH: bool = False,
 ) -> list[str]:
     """Wraps a command with landrun for sandboxing."""
     wrapper = ["landrun"]
@@ -47,10 +47,10 @@ def wrap_landrun(
         wrapper.extend(["--ro", "/etc"])
         wrapper.extend(["--rw", "/dev"])
 
-    if include_path and "PATH" in os.environ:
+    if include_PATH and "PATH" in os.environ:
         path_val = os.environ["PATH"]
         envs.append(f"PATH={path_val}")
-        for p in path_val.split(os.pathsep):
+        for p in path_val.split(os.pathsep): #filter for existing dirs AI!
             if p:
                 rox.append(p)
 
@@ -115,7 +115,7 @@ def main() -> None:
         unrestricted_network=True,
         envs=envs,
         include_std=True,
-        include_path=True
+        include_PATH=True
     )
 
     result: dict[str, Any] = {
