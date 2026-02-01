@@ -2,6 +2,7 @@
 import json
 import sys
 import socket
+import os
 from pathlib import Path
 from typing import Any
 
@@ -70,12 +71,14 @@ def find_free_port() -> int:
 
 def detect_dir(working_dir: Path) -> list[str] | None:
     """Detects the application type and returns the command to run it."""
-    if (working_dir / "main.py").exists():
-        return ["uv", "run", "main.py"]
     if (working_dir / "main.ts").exists():
         return ["deno", "serve", "main.ts"]
-    if (working_dir / "main.sh").exists():
-        return ["bash", "main.sh"]
+
+    for script, runner in [("main.py", "uv"), ("main.sh", "bash")]:
+        path = working_dir / script
+        if path.exists() and os.access(path, os.X_OK):
+            return [runner, script]
+
     return None
 
 def main() -> None:
