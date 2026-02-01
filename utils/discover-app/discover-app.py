@@ -26,12 +26,15 @@ def wrap_landrun(
     rw: list[str] | None = None,
     ro: list[str] | None = None,
     rox: list[str] | None = None,
-    bind_tcp: list[int | str] | None = None,
-    connect_tcp: list[int | str] | None = None,
+    bind_tcp: list[int] | None = None,
+    connect_tcp: list[int] | None = None,
+    unrestricted_network: bool = False,
 ) -> list[str]:
     """Wraps a command with landrun for sandboxing."""
     wrapper = ["landrun"]
 
+    if unrestricted_network:
+        wrapper.append("--unrestricted-network")
     if rwx:
         wrapper.extend(["--rwx", ",".join(rwx)])
     if rw:
