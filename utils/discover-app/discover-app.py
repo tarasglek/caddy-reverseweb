@@ -83,7 +83,7 @@ def detect_dir_and_port(working_dir: Path) -> tuple[list[str], int, list[str]]:
         if path.exists() and os.access(path, os.X_OK):
             return [f"./{script}"], port, envs
 
-    return ["python3", "-m", "http.server", str(port)], port, envs # throw error here isntead AI!
+    raise FileNotFoundError(f"No supported entry point (main.ts, executable main.py, or executable main.sh) found in {working_dir}")
 
 def main() -> None:
     working_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
