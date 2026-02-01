@@ -102,6 +102,7 @@ def main() -> None:
         rox=[str(working_dir.resolve())],
         rw=rw_paths,
         bind_tcp=[port],
+        # unrestricted_network AI!
         envs=envs,
         include_std=True
     )
