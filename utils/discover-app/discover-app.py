@@ -29,10 +29,14 @@ def wrap_landrun(
     bind_tcp: list[int] | None = None,
     connect_tcp: list[int] | None = None,
     unrestricted_network: bool = False,
+    envs: list[str] | None = None,
 ) -> list[str]:
     """Wraps a command with landrun for sandboxing."""
     wrapper = ["landrun"]
 
+    if envs:
+        for env in envs:
+            wrapper.extend(["--env", env])
     if unrestricted_network:
         wrapper.append("--unrestricted-network")
     if rwx:
@@ -56,12 +60,12 @@ def find_free_port() -> int:
         s.bind(("", 0))
         return s.getsockname()[1]
 
-def detect_dir(working_dir: Path, port: int) -> list[str] | None:
+def detect_dir(working_dir: Path) -> list[str] | None:
     """Detects the application type and returns the command to run it."""
     if (working_dir / "main.py").exists():
-        return ["uv", "run", "main.py", "--port", str(port)]
+        return ["uv", "run", "main.py"]
     if (working_dir / "main.ts").exists():
-        return ["deno", "serve", "--port", str(port), "main.ts"]
+        return ["deno", "serve", "main.ts"]
     return None
 
 def main() -> None:
@@ -71,7 +75,7 @@ def main() -> None:
         sys.exit(1)
 
     port = find_free_port()
-    executable = detect_dir(working_dir, port)
+    executable = detect_dir(working_dir)
 
     if not executable:
         executable = ["python3", "-m", "http.server", str(port)]
@@ -80,7 +84,8 @@ def main() -> None:
     executable = wrap_landrun(
         executable,
         rwx=[str(working_dir.resolve())],
-        bind_tcp=[port]
+        bind_tcp=[port],
+        envs=[f"PORT={port}"]
     )
 
     result: dict[str, Any] = {
