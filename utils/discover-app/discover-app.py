@@ -74,6 +74,8 @@ def detect_dir(working_dir: Path) -> list[str] | None:
         return ["uv", "run", "main.py"]
     if (working_dir / "main.ts").exists():
         return ["deno", "serve", "main.ts"]
+    if (working_dir / "main.sh").exists():
+        return ["bash", "main.sh"]
     return None
 
 def main() -> None:
