@@ -4,8 +4,33 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# https://raw.githubusercontent.com/Zouuup/landrun/refs/heads/main/README.md landrun flags documented here
-def wrap_landrun(cmd:string[], permissions(rwxstring[],rw-ro:string[],bind-tcp:number,)) # complete a function that wraps landruncli and returns it AI!
+def wrap_landrun(
+    cmd: list[str],
+    rwx: list[str] | None = None,
+    rw: list[str] | None = None,
+    ro: list[str] | None = None,
+    rox: list[str] | None = None,
+    bind_tcp: list[int] | None = None,
+    connect_tcp: list[int] | None = None,
+) -> list[str]:
+    """Wraps a command with landrun for sandboxing."""
+    wrapper = ["landrun"]
+
+    if rwx:
+        wrapper.extend(["--rwx", ",".join(rwx)])
+    if rw:
+        wrapper.extend(["--rw", ",".join(rw)])
+    if ro:
+        wrapper.extend(["--ro", ",".join(ro)])
+    if rox:
+        wrapper.extend(["--rox", ",".join(rox)])
+    if bind_tcp:
+        wrapper.extend(["--bind-tcp", ",".join(map(str, bind_tcp))])
+    if connect_tcp:
+        wrapper.extend(["--connect-tcp", ",".join(map(str, connect_tcp))])
+
+    return wrapper + cmd
+
 def main() -> None:
     working_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
     if not working_dir.is_dir():
