@@ -105,7 +105,11 @@ def main() -> None:
 
     # Wrap the executable with landrun for sandboxing
     data_dir = working_dir / "data"
-    rw_paths = [str(data_dir.resolve()) for p in [data_dir] if p.is_dir()]
+    rw_paths = []
+    if data_dir.is_dir():
+        resolved_data = str(data_dir.resolve())
+        rw_paths.append(resolved_data)
+        envs.append(f"HOME={resolved_data}")
 
     executable = wrap_landrun(
         executable,
