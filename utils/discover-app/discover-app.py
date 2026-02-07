@@ -110,9 +110,10 @@ def main() -> None:
 
     env_file = working_dir / ".env"
     dot_env_vars = {}
-    # use try/catch to avoid extra stats AI!
-    if env_file.exists():
+    try:
         dot_env_vars = dotenv_values(dotenv_path=env_file)
+    except Exception:
+        pass
 
     executable, port, envs = detect_dir_and_port(working_dir)
     
