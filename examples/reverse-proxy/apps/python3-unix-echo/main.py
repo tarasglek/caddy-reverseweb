@@ -14,6 +14,18 @@ class UnixHTTPServer(http.server.HTTPServer):
         self.socket.bind(self.server_address)
 
 class EchoHandler(http.server.BaseHTTPRequestHandler):
+    def address_string(self):
+        # For Unix sockets, client_address is often an empty string or a path string.
+        # The default implementation tries to access self.client_address[0], which fails.
+        if isinstance(self.client_address, (str, bytes)):
+            return str(self.client_address) or "unix"
+        if not self.client_address or not hasattr(self.client_address, '__getitem__'):
+            return "unix"
+        try:
+            return super().address_string()
+        except (IndexError, TypeError):
+            return "unix"
+
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/plain')
@@ -29,22 +41,17 @@ class EchoHandler(http.server.BaseHTTPRequestHandler):
 if __name__ == "__main__":
     # Use REVERSE_PROXY_TO environment variable
     addr_str = os.environ.get("REVERSE_PROXY_TO")
-    if not addr_str:
-        print("Error: REVERSE_PROXY_TO environment variable is not set", file=sys.stderr)
+    if not addr_str or not addr_str.startswith("unix/"):
+        print("Error: REVERSE_PROXY_TO must be set to a unix/ path", file=sys.stderr)
         sys.exit(1)
-    if addr_str.startswith("unix/"):
-        socket_path = addr_str[5:]
-        if os.path.exists(socket_path):
-            os.remove(socket_path)
-        server_address = socket_path
-        httpd = UnixHTTPServer(server_address, EchoHandler)
-        print(addr_str)
-    else:
-        host, port_str = addr_str.split(':')
-        port = int(port_str)
-        server_address = (host, port)
-        httpd = http.server.HTTPServer(server_address, EchoHandler)
-        print(f"127.0.0.1:{port}")
+
+    socket_path = addr_str[5:]
+    if os.path.exists(socket_path):
+        os.remove(socket_path)
+    
+    server_address = socket_path
+    httpd = UnixHTTPServer(server_address, EchoHandler)
+    print(addr_str)
 
     # Signal readiness to Caddy by printing the address to stdout
     sys.stdout.flush()
@@ -52,5 +59,5 @@ if __name__ == "__main__":
     try:
         httpd.serve_forever()
     finally:
-        if addr_str.startswith("unix/"):
-            os.remove(addr_str[5:])
+        if os.path.exists(socket_path):
+            os.remove(socket_path)
