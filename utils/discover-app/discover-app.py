@@ -120,7 +120,17 @@ def main() -> None:
     # Add variables from .env to the environment list
     for k, v in dot_env_vars.items():
         if v is not None:
-            envs.append(f"{k}={v}")
+            if k == "REVERSE_PROXY_TO":
+                # Override the auto-detected port if specified in .env
+                try:
+                    _, port_str = v.split(':')
+                    port = int(port_str)
+                    # Update the envs list with the overridden value
+                    envs = [f"{k}={v}" if e.startswith("REVERSE_PROXY_TO=") else e for e in envs]
+                except (ValueError, IndexError):
+                    envs.append(f"{k}={v}")
+            else:
+                envs.append(f"{k}={v}")
 
     # Wrap the executable with landrun for sandboxing
     data_dir = working_dir / "data"
