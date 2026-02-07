@@ -90,7 +90,7 @@ def find_free_port() -> int:
 def detect_dir_and_port(working_dir: Path) -> tuple[list[str], int, list[str]]:
     """Detects the application type and returns the command, port, and envs."""
     port = find_free_port()
-    envs = [f"PORT={port}"]
+    envs = [f"REVERSE_PROXY_TO=127.0.0.1:{port}"]
 
     if (working_dir / "main.ts").exists():
         return ["deno", "serve", "--allow-all", "--host", "127.0.0.1", "--port", str(port), "main.ts"], port, envs
