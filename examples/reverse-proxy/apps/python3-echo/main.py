@@ -20,8 +20,11 @@ class EchoHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
 if __name__ == "__main__":
-    # Use REVERSE_PROXY_TO environment variable, default to 127.0.0.1:8001
-    addr_str = os.environ.get("REVERSE_PROXY_TO", "127.0.0.1:8001")
+    # Use REVERSE_PROXY_TO environment variable
+    addr_str = os.environ.get("REVERSE_PROXY_TO")
+    if not addr_str:
+        print("Error: REVERSE_PROXY_TO environment variable is not set", file=sys.stderr)
+        sys.exit(1)
     host, port_str = addr_str.split(':')
     port = int(port_str)
 
