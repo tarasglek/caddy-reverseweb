@@ -1,3 +1,10 @@
+// This file is adapted from Caddy's caddytest test harness:
+// https://github.com/caddyserver/caddy/blob/master/caddytest/caddytest.go
+//
+// Original work Copyright (c) Caddy Authors.
+// Licensed under the Apache License, Version 2.0.
+//
+// Local modifications were made for this repository's integration tests.
 package main
 
 import (
