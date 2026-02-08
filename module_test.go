@@ -1,27 +1,9 @@
 package reversebin
 
-import (
-	"github.com/caddyserver/caddy/v2/caddytest"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"net/http"
-	"testing"
-)
-
-func TestReverseBin_CaddyModule(t *testing.T) {
-	tester := caddytest.NewTester(t)
-	tester.InitServer(`
-	{
-		admin localhost:2999
-		http_port     9080
-		https_port    9443
-	}
-	localhost:9080 {
-		reverse-bin /foo* ./test/example
-	}`, "caddyfile")
-
-	resp, err := tester.Client.Get("http://localhost:9080/foo/bar")
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "text/plain", resp.Header.Get("Content-Type"))
-}
+// Note: The legacy CGI-based test has been removed as reverse-bin now operates
+// as a process-managing reverse proxy rather than a CGI handler.
+// See integration_test.go for the new test suite that validates:
+// - Basic reverse proxy functionality
+// - Unix socket proxy support
+// - Dynamic discovery via detector scripts
+// - Lifecycle management (idle timeout, cleanup)
