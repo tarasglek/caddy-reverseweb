@@ -81,6 +81,7 @@ func (tc *Tester) InitServer(rawConfig, configType string) {
 func (tc *Tester) InitServerWithDefaults(httpPort, httpsPort int, siteBlocks string) {
 	tc.t.Helper()
 	config := fmt.Sprintf(`{
+	debug
 	skip_install_trust
 	admin localhost:%d
 	http_port %d
