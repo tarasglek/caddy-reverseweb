@@ -92,6 +92,45 @@ func (tc *Tester) InitServerWithDefaults(httpPort, httpsPort int, siteBlocks str
 %s
 `, adminPort, httpPort, httpsPort, siteBlocks)
 	tc.InitServer(config, "caddyfile")
+	tc.waitForServerConfig(httpPort)
+}
+
+func (tc *Tester) waitForServerConfig(httpPort int) {
+	tc.t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	wantListen := fmt.Sprintf(`":%d"`, httpPort)
+	for {
+		if tc.configHasListenAddress(wantListen) && tc.httpPortAcceptsConnections(httpPort) {
+			return
+		}
+		if time.Now().After(deadline) {
+			tc.t.Fatalf("timed out waiting for config/listener readiness on http_port %d", httpPort)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func (tc *Tester) configHasListenAddress(wantListen string) bool {
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/config/apps/http/servers", adminPort))
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(body), wantListen)
+}
+
+func (tc *Tester) httpPortAcceptsConnections(httpPort int) bool {
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", httpPort), 500*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
 }
 
 func (tc *Tester) ensureCaddyRunning() error {
