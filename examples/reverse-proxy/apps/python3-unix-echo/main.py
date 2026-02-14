@@ -47,9 +47,13 @@ class EchoHandler(http.server.BaseHTTPRequestHandler):
         global LAST_HEALTH_METHOD
 
         if self.path == "/crash":
-            self._send_json({"status": "crashing", "pid": os.getpid()})
-            self.wfile.flush()
-            os._exit(42)
+            try:
+                self._send_json({"status": "crashing", "pid": os.getpid()})
+                self.wfile.flush()
+            finally:
+                # Always terminate even if client disconnects while writing
+                # the crash response (e.g. BrokenPipeError).
+                os._exit(42)
 
         if self.path == "/health":
             LAST_HEALTH_METHOD = "GET"

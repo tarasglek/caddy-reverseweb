@@ -317,6 +317,7 @@ func TestProcessCrashAndRestart(t *testing.T) {
 	directClient := &http.Client{Transport: directTransport, Timeout: 5 * time.Second}
 	resp, err := directClient.Get("http://unix/crash")
 	if err == nil && resp != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 	}
 
