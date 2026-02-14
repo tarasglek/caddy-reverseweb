@@ -35,7 +35,9 @@ Key items reported in logs include:
   - Fixed race by detecting dead backend process before proxying and forcing restart.
 
 ### C) CI fixes
-- [ ] Make dynamic discovery tests deterministic in CI (`landrun` present or tests skip when unavailable).
+- [x] Ensure CI installs all runtime dependencies required by integration tests.
+  - Added workflow install/verify for `uv`, `jq`, and `landrun` before `go test ./...`.
+- [x] Keep tests strict (no skip-on-missing-tool fallback) once installs are in place.
 - [ ] Re-run CI and confirm `Test Go` passes.
 
 ### D) Vulnerability cleanup
@@ -43,8 +45,19 @@ Key items reported in logs include:
 - [ ] Resolve/mitigate remaining reachable vulnerabilities.
 - [ ] Re-run CI and confirm `Lint Go` passes.
 
+### E) Refactor: unify backend startup/restart path (remove duplicated startup logic)
+- [ ] Introduce a single helper for "ensure process running + ready + upstream resolved".
+- [ ] Route both initial startup and restart-on-dead-process through this helper.
+- [ ] Keep lock boundaries explicit (`ps.mu`) and avoid side effects in multiple call sites.
+- [ ] Add/adjust tests for:
+  - first request startup
+  - crash/restart path
+  - readiness timeout/failure path
+- [ ] Verify no behavior regressions (`go test ./...` local + CI).
+
 ---
 
 ## Next immediate step
-1. Fix `TestProcessCrashAndRestart` regression introduced by dependency upgrades (likely restart readiness/race behavior change).
-2. After local green, push and evaluate CI status.
+1. Re-check CI for commit `b4fb10c` and capture remaining failures.
+2. Continue dependency/vuln cleanup based on current CI output.
+3. Execute startup-path unification refactor (Section E) after CI is stable.
