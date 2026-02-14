@@ -22,13 +22,22 @@ import (
 
 const adminPort = 2999
 
-// Tester is a tiny wrapper around an HTTP client and config loading helpers.
+// Tester is a tiny integration-test harness used to:
+//  1. Start/configure Caddy via the admin API.
+//  2. Provide an HTTP client preconfigured for local test routing.
+//
+// The client transport always dials 127.0.0.1:<port> so requests are stable
+// across localhost/IPv4/IPv6 variations in CI and developer machines.
 type Tester struct {
 	Client       *http.Client
 	t            testing.TB
 	configLoaded bool
 }
 
+// NewTester constructs the integration-test harness and its HTTP client.
+//
+// Use this in integration tests when you need to load config or send requests
+// to the test Caddy instance.
 func NewTester(t testing.TB) *Tester {
 	return &Tester{
 		Client: &http.Client{
@@ -171,6 +180,9 @@ func (tc *Tester) isCaddyAdminRunning() error {
 	return nil
 }
 
+// createTestingTransport normalizes all outbound test HTTP dials to
+// 127.0.0.1:<port>, regardless of the input host, to avoid localhost
+// resolution differences during tests.
 func createTestingTransport() *http.Transport {
 	dialer := net.Dialer{Timeout: 5 * time.Second, KeepAlive: 5 * time.Second}
 	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
