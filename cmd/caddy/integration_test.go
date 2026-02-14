@@ -104,7 +104,6 @@ func requirePaths(t *testing.T, checks ...pathCheck) {
 type fixtures struct {
 	PythonApp string
 	AppDir    string
-	Detector  string
 }
 
 func mustFixtures(t *testing.T) fixtures {
@@ -113,12 +112,10 @@ func mustFixtures(t *testing.T) fixtures {
 	f := fixtures{
 		PythonApp: filepath.Join(repoRoot, "examples/reverse-proxy/apps/python3-unix-echo/main.py"),
 		AppDir:    filepath.Join(repoRoot, "examples/reverse-proxy/apps/python3-unix-echo"),
-		Detector:  filepath.Join(repoRoot, "utils/discover-app/discover-app.py"),
 	}
 	requirePaths(t,
 		pathCheck{Label: "python test app", Path: f.PythonApp, MustBeRegular: true},
 		pathCheck{Label: "dynamic app dir", Path: f.AppDir, MustBeDir: true},
-		pathCheck{Label: "dynamic detector", Path: f.Detector, MustBeRegular: true},
 	)
 	return f
 }
@@ -354,17 +351,34 @@ func TestDynamicDiscovery(t *testing.T) {
 	requireIntegration(t)
 	f := mustFixtures(t)
 
+	detector := createExecutableScript(t, t.TempDir(), "detector-static.py", `#!/usr/bin/env python3
+import json
+import os
+import sys
+from pathlib import Path
+
+app_dir = Path(sys.argv[1]).resolve()
+socket_path = (app_dir / "data" / "echo.sock").resolve()
+result = {
+    "executable": ["python3", str(app_dir / "main.py")],
+    "reverse_proxy_to": f"unix/{socket_path}",
+    "working_directory": str(app_dir),
+    "envs": [f"REVERSE_PROXY_TO=unix/{socket_path}"],
+}
+print(json.dumps(result))
+`)
+
 	setup, dispose := createReverseProxySetup(t, `# Only /dynamic/* routes use dynamic discovery.
 	handle /dynamic/* {
 		reverse-bin {
-			dynamic_proxy_detector uv run --script {{DETECTOR}} {{APP_DIR}}
+			dynamic_proxy_detector {{DETECTOR}} {{APP_DIR}}
 		}
 	}
 	# Explicit non-dynamic route for matcher verification.
 	handle /path {
 		respond "non-dynamic"
 	}`, map[string]string{
-		"DETECTOR": f.Detector,
+		"DETECTOR": detector,
 		"APP_DIR":  f.AppDir,
 	})
 	defer dispose()

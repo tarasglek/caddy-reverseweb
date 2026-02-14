@@ -38,11 +38,13 @@ Key items reported in logs include:
 - [x] Ensure CI installs all runtime dependencies required by integration tests.
   - Added workflow install/verify for `uv`, `jq`, and `landrun` before `go test ./...`.
 - [x] Keep tests strict (no skip-on-missing-tool fallback) once installs are in place.
-- [ ] Re-run CI and confirm `Test Go` passes.
+- [~] Re-run CI and confirm `Test Go` passes.
+  - Local fix applied: made `TestDynamicDiscovery` use a self-contained detector script (no `uv` network download dependency), and local `go test ./...` now passes.
 
 ### D) Vulnerability cleanup
-- [ ] Re-run `govulncheck ./...` after dependency stabilization.
+- [x] Re-run `govulncheck ./...` after dependency stabilization.
 - [ ] Resolve/mitigate remaining reachable vulnerabilities.
+  - Current reachable set includes stdlib `crypto/x509` advisories (fixed in Go >=1.25.5) and `github.com/slackhq/nebula` via transitive Caddy dependencies.
 - [ ] Re-run CI and confirm `Lint Go` passes.
 
 ### E) Refactor: unify backend startup/restart path (remove duplicated startup logic)
