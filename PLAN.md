@@ -43,8 +43,9 @@ Key items reported in logs include:
 
 ### D) Vulnerability cleanup
 - [x] Re-run `govulncheck ./...` after dependency stabilization.
-- [ ] Resolve/mitigate remaining reachable vulnerabilities.
-  - Current reachable set includes stdlib `crypto/x509` advisories (fixed in Go >=1.25.5) and `github.com/slackhq/nebula` via transitive Caddy dependencies.
+- [~] Resolve/mitigate remaining reachable vulnerabilities.
+  - Mitigated `github.com/slackhq/nebula` by upgrading to `v1.9.7`.
+  - Remaining reachable set is currently stdlib `crypto/x509` advisories (fixed in Go >=1.25.5).
 - [ ] Re-run CI and confirm `Lint Go` passes.
 
 ### E) Refactor: unify backend startup/restart path (remove duplicated startup logic)
