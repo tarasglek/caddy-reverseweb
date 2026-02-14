@@ -4,7 +4,7 @@ This document defines how releases should work for publishing `caddy-reverse-bin
 
 ## Goals
 
-- Publish reproducible Go binaries for Linux, macOS, and Windows.
+- Publish reproducible Go binaries for Linux and macOS (no Windows builds).
 - Trigger releases in a predictable way.
 - Generate clear release notes with minimal manual work.
 - Keep release steps simple and modern.
@@ -36,13 +36,12 @@ This ensures releases are explicit and controlled.
 
 ## What Gets Built
 
-For each tag, build binaries for common targets:
+For each tag, build binaries for supported targets:
 
 - `linux/amd64`
 - `linux/arm64`
 - `darwin/amd64`
 - `darwin/arm64`
-- `windows/amd64`
 
 Artifacts should include:
 
@@ -58,6 +57,40 @@ GoReleaser should:
 3. Package artifacts.
 4. Create (or update) the GitHub Release for that tag.
 5. Upload all artifacts as release assets.
+
+## Version Embedding (CLI + Logs)
+
+Each release binary should embed version metadata at build time.
+
+### Build-time variables
+
+- `github.com/caddyserver/caddy/v2.CustomVersion`
+- `github.com/tarasglek/reverse-bin.Version`
+- `github.com/tarasglek/reverse-bin.Commit`
+- `github.com/tarasglek/reverse-bin.BuildDate`
+
+### Why
+
+- `caddy version` should report the release tag (`vX.Y.Z`).
+- `reverse-bin` startup logs should include version, commit, and build date.
+
+### How
+
+Use linker flags in the release build:
+
+```bash
+-ldflags "
+  -X github.com/caddyserver/caddy/v2.CustomVersion={{.Version}}
+  -X github.com/tarasglek/reverse-bin.Version={{.Version}}
+  -X github.com/tarasglek/reverse-bin.Commit={{.Commit}}
+  -X github.com/tarasglek/reverse-bin.BuildDate={{.Date}}
+"
+```
+
+Expected outcome for tag `v1.2.0`:
+
+- CLI: `caddy version` shows `v1.2.0`
+- Logs: module startup log includes `version=v1.2.0`, commit SHA, and build date
 
 ## Release Notes
 
@@ -120,4 +153,4 @@ Avoid manual one-off uploads to keep releases reproducible.
 - Sign binaries/checksums (Cosign).
 - Attach SBOMs.
 - Publish container images in the same release flow.
-- Add Homebrew/Scoop/Nix metadata generation.
+- Add Homebrew/Nix metadata generation.
