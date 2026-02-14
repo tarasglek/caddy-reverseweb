@@ -31,8 +31,8 @@ Key items reported in logs include:
 
 ### B) Local verification before push
 - [x] Re-run local tests in tmux after upgrade attempt.
-- [~] Achieve green local `go test ./...`.
-  - Current result: fails in `cmd/caddy` integration suite (`TestProcessCrashAndRestart`).
+- [x] Achieve green local `go test ./...`.
+  - Fixed race by detecting dead backend process before proxying and forcing restart.
 
 ### C) CI fixes
 - [ ] Make dynamic discovery tests deterministic in CI (`landrun` present or tests skip when unavailable).
