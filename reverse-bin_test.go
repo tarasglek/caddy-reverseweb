@@ -15,11 +15,39 @@ import (
 	"go.uber.org/zap/zaptest"
 )
 
+type reverseBinConfig struct {
+	Executable           []string
+	WorkingDirectory     string
+	Envs                 []string
+	PassEnvs             []string
+	PassAll              bool
+	ReverseProxyTo       string
+	ReadinessMethod      string
+	ReadinessPath        string
+	DynamicProxyDetector []string
+	IdleTimeoutMS        int
+}
+
+func asConfig(c ReverseBin) reverseBinConfig {
+	return reverseBinConfig{
+		Executable:           c.Executable,
+		WorkingDirectory:     c.WorkingDirectory,
+		Envs:                 c.Envs,
+		PassEnvs:             c.PassEnvs,
+		PassAll:              c.PassAll,
+		ReverseProxyTo:       c.ReverseProxyTo,
+		ReadinessMethod:      c.ReadinessMethod,
+		ReadinessPath:        c.ReadinessPath,
+		DynamicProxyDetector: c.DynamicProxyDetector,
+		IdleTimeoutMS:        c.IdleTimeoutMS,
+	}
+}
+
 func TestReverseBin_UnmarshalCaddyfile(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected ReverseBin
+		expected reverseBinConfig
 		wantErr  bool
 	}{
 		{
@@ -31,7 +59,7 @@ func TestReverseBin_UnmarshalCaddyfile(t *testing.T) {
   pass_env some_env other_env
   pass_all_env
 }`,
-			expected: ReverseBin{
+			expected: reverseBinConfig{
 				Executable:       []string{"/some/file", "a", "b", "c", "d", "1"},
 				WorkingDirectory: "/somewhere",
 				Envs:             []string{"foo=bar", "what=ever"},
@@ -46,7 +74,7 @@ func TestReverseBin_UnmarshalCaddyfile(t *testing.T) {
   exec ./main.py
   reverse_proxy_to 127.0.0.1:8080
 }`,
-			expected: ReverseBin{
+			expected: reverseBinConfig{
 				Executable:       []string{"./main.py"},
 				ReverseProxyTo:   "127.0.0.1:8080",
 			},
@@ -58,7 +86,7 @@ func TestReverseBin_UnmarshalCaddyfile(t *testing.T) {
   exec ./main.py
   reverse_proxy_to :8080
 }`,
-			expected: ReverseBin{
+			expected: reverseBinConfig{
 				Executable:       []string{"./main.py"},
 				ReverseProxyTo:   ":8080",
 			},
@@ -70,7 +98,7 @@ func TestReverseBin_UnmarshalCaddyfile(t *testing.T) {
   exec ./main.py
   reverse_proxy_to unix//tmp/app.sock
 }`,
-			expected: ReverseBin{
+			expected: reverseBinConfig{
 				Executable:       []string{"./main.py"},
 				ReverseProxyTo:   "unix//tmp/app.sock",
 			},
@@ -83,7 +111,7 @@ func TestReverseBin_UnmarshalCaddyfile(t *testing.T) {
   reverse_proxy_to 127.0.0.1:8080
   readiness_check GET /health
 }`,
-			expected: ReverseBin{
+			expected: reverseBinConfig{
 				Executable:       []string{"./main.py"},
 				ReverseProxyTo:   "127.0.0.1:8080",
 				ReadinessMethod:  "GET",
@@ -98,7 +126,7 @@ func TestReverseBin_UnmarshalCaddyfile(t *testing.T) {
   reverse_proxy_to 127.0.0.1:8080
   readiness_check head /ready
 }`,
-			expected: ReverseBin{
+			expected: reverseBinConfig{
 				Executable:       []string{"./main.py"},
 				ReverseProxyTo:   "127.0.0.1:8080",
 				ReadinessMethod:  "HEAD",
@@ -113,7 +141,7 @@ func TestReverseBin_UnmarshalCaddyfile(t *testing.T) {
   reverse_proxy_to unix//tmp/app.sock
   readiness_check null
 }`,
-			expected: ReverseBin{
+			expected: reverseBinConfig{
 				Executable:     []string{"./main.py"},
 				ReverseProxyTo: "unix//tmp/app.sock",
 			},
@@ -124,7 +152,7 @@ func TestReverseBin_UnmarshalCaddyfile(t *testing.T) {
 			input: `reverse-bin {
   dynamic_proxy_detector ./discover.py {path}
 }`,
-			expected: ReverseBin{
+			expected: reverseBinConfig{
 				DynamicProxyDetector: []string{"./discover.py", "{path}"},
 			},
 			wantErr: false,
@@ -142,7 +170,7 @@ func TestReverseBin_UnmarshalCaddyfile(t *testing.T) {
   dynamic_proxy_detector /bin/detect {host} {path}
   idle_timeout_ms 100
 }`,
-			expected: ReverseBin{
+			expected: reverseBinConfig{
 				Executable:           []string{"./main.py", "arg1", "arg2"},
 				WorkingDirectory:     "/app",
 				Envs:                 []string{"FOO=bar", "BAZ=qux"},
@@ -161,7 +189,7 @@ func TestReverseBin_UnmarshalCaddyfile(t *testing.T) {
 			input: `reverse-bin {
   exec
 }`,
-			expected: ReverseBin{},
+			expected: reverseBinConfig{},
 			wantErr:  true,
 		},
 		{
@@ -170,7 +198,7 @@ func TestReverseBin_UnmarshalCaddyfile(t *testing.T) {
   exec ./main.py
   unknown_option value
 }`,
-			expected: ReverseBin{},
+			expected: reverseBinConfig{},
 			wantErr:  true,
 		},
 	}
@@ -192,8 +220,8 @@ func TestReverseBin_UnmarshalCaddyfile(t *testing.T) {
 				t.Fatalf("Cannot parse caddyfile: %v", err)
 			}
 
-			if !reflect.DeepEqual(c, tt.expected) {
-				t.Errorf("Parsing yielded invalid result.\nGot:      %#v\nExpected: %#v", c, tt.expected)
+			if !reflect.DeepEqual(asConfig(c), tt.expected) {
+				t.Errorf("Parsing yielded invalid result.\nGot:      %#v\nExpected: %#v", asConfig(c), tt.expected)
 			}
 		})
 	}
@@ -302,12 +330,12 @@ func TestReverseBin_GetProcessKey(t *testing.T) {
 func TestReverseBin_ProvisionValidation(t *testing.T) {
 	tests := []struct {
 		name    string
-		cfg     ReverseBin
+		cfg     reverseBinConfig
 		wantErr bool
 	}{
 		{
 			name: "invalid static non-unix without readiness_check",
-			cfg: ReverseBin{
+			cfg: reverseBinConfig{
 				Executable:     []string{"./main.py"},
 				ReverseProxyTo: "127.0.0.1:8080",
 			},
@@ -315,7 +343,7 @@ func TestReverseBin_ProvisionValidation(t *testing.T) {
 		},
 		{
 			name: "valid static non-unix with readiness_check",
-			cfg: ReverseBin{
+			cfg: reverseBinConfig{
 				Executable:      []string{"./main.py"},
 				ReverseProxyTo:  "127.0.0.1:8080",
 				ReadinessMethod: "GET",
@@ -325,7 +353,7 @@ func TestReverseBin_ProvisionValidation(t *testing.T) {
 		},
 		{
 			name: "valid static unix without readiness_check",
-			cfg: ReverseBin{
+			cfg: reverseBinConfig{
 				Executable:     []string{"./main.py"},
 				ReverseProxyTo: "unix//tmp/app.sock",
 			},
@@ -333,21 +361,21 @@ func TestReverseBin_ProvisionValidation(t *testing.T) {
 		},
 		{
 			name: "valid dynamic config",
-			cfg: ReverseBin{
+			cfg: reverseBinConfig{
 				DynamicProxyDetector: []string{"./detect.py"},
 			},
 			wantErr: false,
 		},
 		{
 			name: "missing executable without detector",
-			cfg: ReverseBin{
+			cfg: reverseBinConfig{
 				ReverseProxyTo: "127.0.0.1:8080",
 			},
 			wantErr: true,
 		},
 		{
 			name: "missing reverse_proxy_to without detector",
-			cfg: ReverseBin{
+			cfg: reverseBinConfig{
 				Executable: []string{"./main.py"},
 			},
 			wantErr: true,
