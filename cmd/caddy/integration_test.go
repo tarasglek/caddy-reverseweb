@@ -528,6 +528,8 @@ sleep 30
 	defer dispose()
 
 	client := &http.Client{Transport: createTestingTransport(), Timeout: 20 * time.Second}
+	// Request a proxied route to trigger backend startup + readiness polling.
+	// Invariant: backend never binds the configured upstream, so readiness times out and reverse-bin must return 503.
 	_, _ = assertGetResponse(t, client, fmt.Sprintf("http://localhost:%d/fail/test", setup.Port), 503, "", "request must fail with 503 when readiness polling times out")
 }
 
