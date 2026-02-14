@@ -45,7 +45,8 @@ Key items reported in logs include:
 - [x] Re-run `govulncheck ./...` after dependency stabilization.
 - [~] Resolve/mitigate remaining reachable vulnerabilities.
   - Mitigated `github.com/slackhq/nebula` by upgrading to `v1.9.7`.
-  - Remaining reachable set is currently stdlib `crypto/x509` advisories (fixed in Go >=1.25.5).
+  - Local `govulncheck` now reports only stdlib vulns (`net/url`, `crypto/tls`, `crypto/x509`) fixed in Go patch releases >= `1.25.7`.
+  - Pinned CI workflows to Go `1.25.7` to pick up stdlib fixes in CI runs.
 - [ ] Re-run CI and confirm `Lint Go` passes.
 
 ### E) Refactor: unify backend startup/restart path (remove duplicated startup logic)
