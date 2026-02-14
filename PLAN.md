@@ -49,7 +49,7 @@ Key items reported in logs include:
 - [ ] Re-run CI and confirm `Lint Go` passes.
 
 ### E) Refactor: unify backend startup/restart path (remove duplicated startup logic)
-- [ ] TODO: analyze `TestProcessCrashAndRestart` flakiness and make it deterministic.
+- [ ] First priority: refactor runtime process/restart path so dependency bump to `github.com/smallstep/certificates@v0.29.0` remains stable (eliminate transient post-crash 502 race).
 - [ ] Introduce a single helper for "ensure process running + ready + upstream resolved".
 - [ ] Route both initial startup and restart-on-dead-process through this helper.
 - [ ] Keep lock boundaries explicit (`ps.mu`) and avoid side effects in multiple call sites.

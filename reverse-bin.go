@@ -175,7 +175,29 @@ func isProcessAlive(proc *os.Process) bool {
 		// Best-effort on Windows; cmd.Wait() watcher will eventually clear state.
 		return true
 	}
-	return proc.Signal(syscall.Signal(0)) == nil
+	if proc.Signal(syscall.Signal(0)) != nil {
+		return false
+	}
+	if runtime.GOOS == "linux" && isZombiePID(proc.Pid) {
+		return false
+	}
+	return true
+}
+
+func isZombiePID(pid int) bool {
+	// /proc/<pid>/stat format: pid (comm) state ...
+	// We only need the single-letter process state after the closing ')'.
+	statPath := fmt.Sprintf("/proc/%d/stat", pid)
+	data, err := os.ReadFile(statPath)
+	if err != nil {
+		return false
+	}
+	closeIdx := bytes.LastIndexByte(data, ')')
+	if closeIdx == -1 || closeIdx+2 >= len(data) {
+		return false
+	}
+	state := data[closeIdx+2]
+	return state == 'Z'
 }
 
 type proxyOverrides struct {
