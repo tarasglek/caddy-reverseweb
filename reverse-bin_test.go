@@ -28,7 +28,7 @@ type reverseBinConfig struct {
 	IdleTimeoutMS        int
 }
 
-func asConfig(c ReverseBin) reverseBinConfig {
+func asConfig(c *ReverseBin) reverseBinConfig {
 	return reverseBinConfig{
 		Executable:           c.Executable,
 		WorkingDirectory:     c.WorkingDirectory,
@@ -220,8 +220,8 @@ func TestReverseBin_UnmarshalCaddyfile(t *testing.T) {
 				t.Fatalf("Cannot parse caddyfile: %v", err)
 			}
 
-			if !reflect.DeepEqual(asConfig(c), tt.expected) {
-				t.Errorf("Parsing yielded invalid result.\nGot:      %#v\nExpected: %#v", asConfig(c), tt.expected)
+			if !reflect.DeepEqual(asConfig(&c), tt.expected) {
+				t.Errorf("Parsing yielded invalid result.\nGot:      %#v\nExpected: %#v", asConfig(&c), tt.expected)
 			}
 		})
 	}
