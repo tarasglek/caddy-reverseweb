@@ -49,15 +49,17 @@ Key items reported in logs include:
 - [ ] Re-run CI and confirm `Lint Go` passes.
 
 ### E) Refactor: unify backend startup/restart path (remove duplicated startup logic)
-- [ ] First priority: refactor runtime process/restart path so dependency bump to `github.com/smallstep/certificates@v0.29.0` remains stable (eliminate transient post-crash 502 race).
-- [ ] Introduce a single helper for "ensure process running + ready + upstream resolved".
-- [ ] Route both initial startup and restart-on-dead-process through this helper.
-- [ ] Keep lock boundaries explicit (`ps.mu`) and avoid side effects in multiple call sites.
-- [ ] Add/adjust tests for:
-  - first request startup
-  - crash/restart path
-  - readiness timeout/failure path
-- [ ] Verify no behavior regressions (`go test ./...` local + CI).
+- [x] First priority: refactor runtime process/restart path so dependency bump to `github.com/smallstep/certificates@v0.29.0` remains stable (eliminate transient post-crash 502 race).
+- [x] Introduce a single helper for "ensure process running + ready + upstream resolved".
+- [x] Route both initial startup and restart-on-dead-process through this helper.
+- [x] Keep lock boundaries explicit (`ps.mu`) and avoid side effects in multiple call sites.
+- [x] Add/adjust tests for:
+  - [x] first request startup
+  - [x] crash/restart path
+  - [x] readiness timeout/failure path
+- [~] Verify no behavior regressions (`go test ./...` local + CI).
+  - [x] local `go test ./...` in tmux is green
+  - [ ] CI rerun pending
 
 ---
 

@@ -85,74 +85,109 @@ func (c *ReverseBin) GetUpstreams(r *http.Request) ([]*reverseproxy.Upstream, er
 	key := c.getProcessKey(r)
 	ps := c.getOrCreateProcessState(key)
 
+	toAddr, err := c.ensureProcessRunningAndResolveUpstream(r, ps, key)
+	if err != nil {
+		return nil, err
+	}
+
+	dialAddr, err := resolveDialAddress(toAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	c.logger.Debug("selected upstream", zap.String("dial", dialAddr))
+	return []*reverseproxy.Upstream{{Dial: dialAddr}}, nil
+}
+
+func (c *ReverseBin) ensureProcessRunningAndResolveUpstream(r *http.Request, ps *processState, key string) (string, error) {
 	ps.mu.Lock()
-	if ps.process != nil && !isProcessAlive(ps.process) {
-		c.logger.Warn("detected dead backend process before proxying; restarting",
-			zap.String("key", key),
-			zap.Int("pid", ps.process.Pid))
-		ps.process = nil
-		ps.cancel = nil
-		// Clean up stale unix socket path if present; readiness/startup will recreate it.
-		staleAddr := c.ReverseProxyTo
-		if ps.overrides != nil && ps.overrides.ReverseProxyTo != nil {
-			staleAddr = *ps.overrides.ReverseProxyTo
-		}
-		if isUnixUpstream(staleAddr) {
-			socketPath := strings.TrimPrefix(staleAddr, "unix/")
-			_ = os.Remove(socketPath)
+	defer ps.mu.Unlock()
+
+	if ps.process != nil {
+		if !isProcessAlive(ps.process) {
+			c.handleDeadProcessLocked(ps, key)
+		} else {
+			currentAddr := c.ReverseProxyTo
+			if ps.overrides != nil && ps.overrides.ReverseProxyTo != nil {
+				currentAddr = *ps.overrides.ReverseProxyTo
+			}
+			if isUnixUpstream(currentAddr) && !isUnixSocketReady(strings.TrimPrefix(currentAddr, "unix/")) {
+				c.logger.Warn("backend process alive but unix socket unavailable; restarting",
+					zap.String("key", key),
+					zap.Int("pid", ps.process.Pid),
+					zap.String("socket", strings.TrimPrefix(currentAddr, "unix/")))
+				c.handleDeadProcessLocked(ps, key)
+			}
 		}
 	}
 	if ps.process == nil {
 		overrides, err := c.startProcess(r, ps, key)
 		if err != nil {
-			ps.mu.Unlock()
-			return nil, err
+			return "", err
 		}
 		ps.overrides = overrides
 	}
 
-	// Stop idle timer if running
 	if ps.idleTimer != nil {
 		ps.idleTimer.Stop()
 		ps.idleTimer = nil
 	}
-	overrides := ps.overrides
-	ps.mu.Unlock()
 
 	toAddr := c.ReverseProxyTo
-	if overrides != nil && overrides.ReverseProxyTo != nil {
-		toAddr = *overrides.ReverseProxyTo
+	if ps.overrides != nil && ps.overrides.ReverseProxyTo != nil {
+		toAddr = *ps.overrides.ReverseProxyTo
 	}
+	return toAddr, nil
+}
 
-	var dialAddr string
+func (c *ReverseBin) handleDeadProcessLocked(ps *processState, key string) {
+	c.logger.Warn("detected dead backend process before proxying; restarting",
+		zap.String("key", key),
+		zap.Int("pid", ps.process.Pid))
+	ps.process = nil
+	ps.cancel = nil
+
+	staleAddr := c.ReverseProxyTo
+	if ps.overrides != nil && ps.overrides.ReverseProxyTo != nil {
+		staleAddr = *ps.overrides.ReverseProxyTo
+	}
+	if isUnixUpstream(staleAddr) {
+		socketPath := strings.TrimPrefix(staleAddr, "unix/")
+		_ = os.Remove(socketPath)
+	}
+}
+
+func resolveDialAddress(toAddr string) (string, error) {
 	if isUnixUpstream(toAddr) {
-		dialAddr = toAddr
-		socketPath := strings.TrimPrefix(dialAddr, "unix/")
-		info, err := os.Stat(socketPath)
-		if err != nil {
-			return nil, fmt.Errorf("unix socket not ready: %s: %w", socketPath, err)
+		socketPath := strings.TrimPrefix(toAddr, "unix/")
+		if !isUnixSocketReady(socketPath) {
+			return "", fmt.Errorf("unix socket not ready: %s", socketPath)
 		}
-		if info.Mode()&os.ModeSocket == 0 {
-			return nil, fmt.Errorf("unix socket path is not a socket: %s", socketPath)
-		}
-	} else {
-		if strings.HasPrefix(toAddr, ":") {
-			toAddr = "127.0.0.1" + toAddr
-		}
-		if !strings.HasPrefix(toAddr, "http://") && !strings.HasPrefix(toAddr, "https://") {
-			toAddr = "http://" + toAddr
-		}
-
-		target, err := url.Parse(toAddr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid reverse_proxy_to address: %v", err)
-		}
-		dialAddr = target.Host
+		return toAddr, nil
 	}
-	c.logger.Debug("selected upstream", zap.String("dial", dialAddr))
-	return []*reverseproxy.Upstream{
-		{Dial: dialAddr},
-	}, nil
+
+	if strings.HasPrefix(toAddr, ":") {
+		toAddr = "127.0.0.1" + toAddr
+	}
+	if !strings.HasPrefix(toAddr, "http://") && !strings.HasPrefix(toAddr, "https://") {
+		toAddr = "http://" + toAddr
+	}
+	target, err := url.Parse(toAddr)
+	if err != nil {
+		return "", fmt.Errorf("invalid reverse_proxy_to address: %v", err)
+	}
+	if target.Host == "" {
+		return "", fmt.Errorf("invalid reverse_proxy_to address: missing host")
+	}
+	return target.Host, nil
+}
+
+func isUnixSocketReady(socketPath string) bool {
+	info, err := os.Stat(socketPath)
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeSocket != 0
 }
 
 func (c *ReverseBin) killProcessGroup(proc *os.Process) {

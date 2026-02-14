@@ -499,6 +499,37 @@ func TestReadinessCheck(t *testing.T) {
 	}
 }
 
+// TestReadinessFailureTimeout validates that readiness polling timeout surfaces as 503.
+// Strategy: start a long-running process that never binds reverse_proxy_to, so readiness
+// cannot succeed and reverse-bin must fail request with service unavailable.
+func TestReadinessFailureTimeout(t *testing.T) {
+	requireIntegration(t)
+
+	port, err := GetFreePort()
+	if err != nil {
+		t.Fatalf("failed to get free backend port: %v", err)
+	}
+
+	sleeper := createExecutableScript(t, t.TempDir(), "sleep-forever.sh", `#!/usr/bin/env sh
+sleep 30
+`)
+
+	setup, dispose := createReverseProxySetup(t, `handle /fail/* {
+		reverse-bin {
+			exec {{SLEEPER}}
+			reverse_proxy_to 127.0.0.1:{{BACKEND_PORT}}
+			readiness_check GET /health
+		}
+	}`, map[string]string{
+		"SLEEPER":      sleeper,
+		"BACKEND_PORT": fmt.Sprintf("%d", port),
+	})
+	defer dispose()
+
+	client := &http.Client{Transport: createTestingTransport(), Timeout: 20 * time.Second}
+	_, _ = assertGetResponse(t, client, fmt.Sprintf("http://localhost:%d/fail/test", setup.Port), 503, "", "request must fail with 503 when readiness polling times out")
+}
+
 // TestLifecycleIdleTimeout verifies a backend process is terminated after configured idle_timeout_ms.
 func TestLifecycleIdleTimeout(t *testing.T) {
 	requireIntegration(t)
