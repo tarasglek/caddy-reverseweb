@@ -90,7 +90,7 @@ If startup fails, check capability and environment variable errors first.
 ## 7) Running via systemd (current-use example)
 
 Use the bundled installer script to install/update `/etc/systemd/system/reverse-bin.service`.
-It derives the reverse-bin root from the script location (`.bin/setup-systemd.py`), writes the unit file directly, then reloads + enables/starts the service.
+It derives the reverse-bin root from the script location (`.bin/setup-systemd.py`), writes the unit file directly, sets `cap_net_bind_service` on `.bin/caddy`, prints capability/service diagnostics, then reloads + enables/starts the service.
 
 Run it as root:
 
@@ -99,8 +99,3 @@ cd /home/YOUR_USER/reverse-bin
 sudo ./.bin/setup-systemd.py YOUR_USER
 ```
 
-Important: ensure non-root bind capability on `:80/:443` is set:
-
-```bash
-sudo setcap 'cap_net_bind_service=+ep' /home/YOUR_USER/reverse-bin/.bin/caddy
-```
