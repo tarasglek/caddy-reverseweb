@@ -73,7 +73,7 @@ service_path.write_text(unit)
 run(["setcap", "cap_net_bind_service=+ep", str(caddy_path)])
 run(["getcap", str(caddy_path)])
 # Prime uv cache as target user so first detector execution is fast.
-run(["sudo", "-H", "-u", username, "env", f"PATH={root}/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", str(discover_path), "--help"])
+run(["sudo", "-H", "-u", username, "env", f"PATH={root}/.bin:{os.environ.get('PATH', '')}", str(discover_path), "--help"])
 run(["systemctl", "daemon-reload"])
 run(["systemctl", "enable", "--now", service_name])
 run(["systemctl", "restart", service_name])
