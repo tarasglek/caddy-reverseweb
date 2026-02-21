@@ -14,10 +14,14 @@ if len(sys.argv) != 2:
     raise SystemExit(1)
 
 username = sys.argv[1]
-
-root = str(Path(__file__).resolve().parent.parent)
+root = Path(__file__).resolve().parent.parent
 service_name = "reverse-bin.service"
-service_path = f"/etc/systemd/system/{service_name}"
+service_path = Path("/etc/systemd/system") / service_name
+caddy_path = root / ".bin" / "caddy"
+
+if not caddy_path.exists():
+    print(f"error: caddy binary not found: {caddy_path}", file=sys.stderr)
+    raise SystemExit(1)
 
 unit = f"""[Unit]
 Description=reverse-bin Caddy proxy
@@ -39,9 +43,20 @@ RestartSec=2
 WantedBy=multi-user.target
 """
 
-Path(service_path).write_text(unit)
-subprocess.run(["systemctl", "daemon-reload"], check=True)
-subprocess.run(["systemctl", "enable", "--now", service_name], check=True)
-subprocess.run(["systemctl", "status", "--no-pager", service_name], check=True)
+print(f"writing {service_path}")
+service_path.write_text(unit)
 
-print(f"set capability once if missing:\n  setcap 'cap_net_bind_service=+ep' {root}/.bin/caddy")
+print(f"setting cap_net_bind_service on {caddy_path}")
+subprocess.run(["setcap", "cap_net_bind_service=+ep", str(caddy_path)], check=True)
+
+print("capability diagnostics:")
+subprocess.run(["getcap", str(caddy_path)], check=True)
+
+print("reloading systemd")
+subprocess.run(["systemctl", "daemon-reload"], check=True)
+
+print(f"enabling + starting {service_name}")
+subprocess.run(["systemctl", "enable", "--now", service_name], check=True)
+
+print("service diagnostics:")
+subprocess.run(["systemctl", "status", "--no-pager", service_name], check=True)
