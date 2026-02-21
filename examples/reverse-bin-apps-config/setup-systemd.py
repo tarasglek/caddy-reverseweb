@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 import os
+import shlex
 from pathlib import Path
 import subprocess
 import sys
+
+
+def run(cmd: list[str]) -> None:
+    print(f"+ {shlex.join(cmd)}", file=sys.stderr)
+    subprocess.run(cmd, check=True)
 
 
 if os.geteuid() != 0:
@@ -46,17 +52,8 @@ WantedBy=multi-user.target
 print(f"writing {service_path}")
 service_path.write_text(unit)
 
-print(f"setting cap_net_bind_service on {caddy_path}")
-subprocess.run(["setcap", "cap_net_bind_service=+ep", str(caddy_path)], check=True)
-
-print("capability diagnostics:")
-subprocess.run(["getcap", str(caddy_path)], check=True)
-
-print("reloading systemd")
-subprocess.run(["systemctl", "daemon-reload"], check=True)
-
-print(f"enabling + starting {service_name}")
-subprocess.run(["systemctl", "enable", "--now", service_name], check=True)
-
-print("service diagnostics:")
-subprocess.run(["systemctl", "status", "--no-pager", service_name], check=True)
+run(["setcap", "cap_net_bind_service=+ep", str(caddy_path)])
+run(["getcap", str(caddy_path)])
+run(["systemctl", "daemon-reload"])
+run(["systemctl", "enable", "--now", service_name])
+run(["systemctl", "status", "--no-pager", service_name])
