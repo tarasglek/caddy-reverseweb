@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import pwd
 import shlex
 from pathlib import Path
 import subprocess
@@ -11,15 +12,21 @@ def run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)
 
 
-if os.geteuid() != 0:
-    print("error: run as root", file=sys.stderr)
-    raise SystemExit(1)
-
 if len(sys.argv) != 2:
     print("usage: setup-systemd.py <username>", file=sys.stderr)
     raise SystemExit(1)
 
 username = sys.argv[1]
+
+try:
+    pwd.getpwnam(username)
+except KeyError:
+    print(f"error: user not found: {username}", file=sys.stderr)
+    raise SystemExit(1)
+
+if os.geteuid() != 0:
+    print("error: run as root", file=sys.stderr)
+    raise SystemExit(1)
 root = Path(__file__).resolve().parent.parent
 service_name = "reverse-bin.service"
 service_path = Path("/etc/systemd/system") / service_name
@@ -56,4 +63,5 @@ run(["setcap", "cap_net_bind_service=+ep", str(caddy_path)])
 run(["getcap", str(caddy_path)])
 run(["systemctl", "daemon-reload"])
 run(["systemctl", "enable", "--now", service_name])
+run(["systemctl", "restart", service_name])
 run(["systemctl", "status", "--no-pager", service_name])
