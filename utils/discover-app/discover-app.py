@@ -6,6 +6,7 @@
 # ]
 # ///
 
+import argparse
 import json
 import os
 import socket
@@ -77,7 +78,12 @@ def detect_entrypoint(working_dir: Path, reverse_proxy_to: str) -> list[str]:
 
 
 def main() -> None:
-    working_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(".")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("working_dir", nargs="?", default=".")
+    parser.add_argument("--no-sandbox", action="store_true")
+    args = parser.parse_args()
+
+    working_dir = Path(args.working_dir)
     if not working_dir.is_dir():
         print(f"Error: directory {working_dir} does not exist", file=sys.stderr)
         raise SystemExit(1)
@@ -97,6 +103,8 @@ def main() -> None:
 
     envs = [f"REVERSE_PROXY_TO={reverse_proxy_to}"]
     envs += [f"{k}={v}" for k, v in dot_env.items() if k != "REVERSE_PROXY_TO"]
+    if path := os.environ.get("PATH"):
+        envs.append(f"PATH={path}")
 
     rw_paths: list[str] = []
     if (data_dir := working_dir / "data").is_dir():
@@ -112,13 +120,14 @@ def main() -> None:
             pass
 
     executable = detect_entrypoint(working_dir, reverse_proxy_to)
-    executable = wrap_landrun(
-        executable,
-        rox=[str(working_dir.resolve())],
-        rw=rw_paths,
-        bind_tcp=bind_tcp,
-        envs=envs,
-    )
+    if not args.no_sandbox:
+        executable = wrap_landrun(
+            executable,
+            rox=[str(working_dir.resolve())],
+            rw=rw_paths,
+            bind_tcp=bind_tcp,
+            envs=envs,
+        )
 
     final_reverse_proxy_to = reverse_proxy_to
     if reverse_proxy_to.startswith("unix/"):
@@ -131,6 +140,7 @@ def main() -> None:
                 "executable": executable,
                 "reverse_proxy_to": final_reverse_proxy_to,
                 "working_directory": str(working_dir.resolve()),
+                "envs": envs,
             }
         )
     )
